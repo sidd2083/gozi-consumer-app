@@ -1,0 +1,110 @@
+export interface AppConfig {
+  deliveryFee: number;
+  freeDeliveryAbove: number;
+  estimatedMinutes: number;
+  storeCoordinates: {
+    lat: number;
+    lng: number;
+  };
+}
+
+export interface UserAddress {
+  id: string;
+  label: 'Home' | 'Work' | 'Other';
+  fullAddress: string;
+  landmark: string;
+  lat: number;
+  lng: number;
+}
+
+export interface UserProfile {
+  uid: string;
+  name: string;
+  phone: string;
+  addresses: UserAddress[];
+  defaultAddressId: string | null;
+  createdAt: string;
+}
+
+export type CategorySection = 'Grocery & Kitchen' | 'Snacks & Drinks' | 'Beauty, Skin Care & Household';
+
+export interface Category {
+  id: string;
+  name: string;
+  imageUrl: string;
+  section: CategorySection;
+  priorityOrder: number;
+  isActive: boolean;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  categoryId: string;
+  unit: string;
+  mrp: number;
+  sellingPrice: number;
+  discountPercent: number;
+  images: string[];
+  inStock: boolean;
+  isHidden: boolean;
+  isBestseller: boolean;
+  storeId: string;
+  shelfTag?: 'trending' | 'snacks' | 'morning' | 'beauty' | 'general';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
+export type OrderStatus = 'placed' | 'packing' | 'handover' | 'reached' | 'delivered' | 'cancelled';
+
+export interface OrderItem {
+  productId: string;
+  name: string;
+  unit: string;
+  price: number;
+  qty: number;
+  imageUrl: string;
+}
+
+export interface OrderBill {
+  itemTotal: number;
+  deliveryFee: number;
+  grandTotal: number;
+}
+
+export interface RiderDetails {
+  name: string;
+  phone: string;
+  photoUrl: string;
+  lat: number;
+  lng: number;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  userId: string;
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: {
+    fullAddress: string;
+    landmark: string;
+    lat: number;
+    lng: number;
+  };
+  items: OrderItem[];
+  bill: OrderBill;
+  paymentMethod: 'COD';
+  status: OrderStatus;
+  riderId: string | null;
+  riderDetails: RiderDetails | null;
+  storeId: string;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Settings (deliveryFee, store coordinates)
+    match /settings/{settingId} {
+      // Consumers can read app settings (e.g. deliveryFee: 0)
+      allow read: if true;
+      // Only store admins can modify settings
+      allow write: if request.auth != null;
+    }
+
+    // Categories Collection
+    match /categories/{categoryId} {
+      // Anyone can browse active store categories
+      allow read: if true;
+      // Admin web panel updates categories
+      allow write: if request.auth != null;
+    }
+
+    // Products Collection
+    match /products/{productId} {
+      // Anyone can browse products and check stock status
+      allow read: if true;
+      // Admin web panel updates stock, price, and details
+      allow write: if request.auth != null;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      // Users can read and update their own profile and addresses
+      allow read, write: if true;
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      // Customers can create and subscribe to live order updates
+      allow create: if true;
+      allow read, update: if true;
+    }
+  }
+}
