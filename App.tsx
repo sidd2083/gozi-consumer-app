@@ -10,6 +10,7 @@ import { CategoriesTabScreen } from './src/screens/CategoriesTabScreen';
 import { CartScreen } from './src/screens/CartScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { OrderTrackingScreen } from './src/screens/OrderTrackingScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 import { BottomNavBar, TabName } from './src/components/BottomNavBar';
 import { FloatingCartBar } from './src/components/FloatingCartBar';
 
@@ -21,6 +22,9 @@ function MainAppShell() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
 
   // 1. Splash Screen Gate
   if (showSplash) {
@@ -41,7 +45,21 @@ function MainAppShell() {
     return <OnboardingFlow onSuccess={() => setActiveTab('home')} />;
   }
 
-  // 4. Search Screen
+  // 4. Profile Screen
+  if (profileOpen) {
+    return (
+      <ProfileScreen
+        onBack={() => setProfileOpen(false)}
+        onNavigateToTracking={(orderId: string) => {
+          setProfileOpen(false);
+          setTrackingOrderId(orderId);
+        }}
+        onNavigateToAddresses={() => setAddressModalVisible(true)}
+      />
+    );
+  }
+
+  // 5. Search Screen
   if (searchOpen) {
     return (
       <SearchScreen
@@ -54,7 +72,7 @@ function MainAppShell() {
     );
   }
 
-  // 5. Live Tracking
+  // 6. Live Tracking
   if (trackingOrderId) {
     return (
       <OrderTrackingScreen
@@ -67,7 +85,7 @@ function MainAppShell() {
     );
   }
 
-  // 6. Tabs
+  // 7. Tabs
   const renderTabContent = () => {
     switch (activeTab) {
       case 'home':
@@ -78,6 +96,8 @@ function MainAppShell() {
               setActiveTab('categories');
             }}
             onNavigateToSearch={() => setSearchOpen(true)}
+            onNavigateToProfile={() => setProfileOpen(true)}
+            onOpenAddressSelector={() => setAddressModalVisible(true)}
           />
         );
       case 'categories':
@@ -87,7 +107,7 @@ function MainAppShell() {
           <CartScreen
             onBack={() => setActiveTab('home')}
             onOrderPlaced={(orderId) => setTrackingOrderId(orderId)}
-            onOpenAddressSelector={() => {}}
+            onOpenAddressSelector={() => setAddressModalVisible(true)}
           />
         );
       default:
