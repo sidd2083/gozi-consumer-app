@@ -35,21 +35,21 @@ async function seed() {
     await setDoc(doc(db, 'settings', 'appConfig'), INITIAL_APP_CONFIG);
     console.log('✅ settings/appConfig seeded successfully!');
 
-    // 2. Seed 14 Categories across 3 sections
-    console.log('📂 Seeding 14 Sectioned Categories...');
+    // 2. Seed 16 Categories across departments
+    console.log('📂 Seeding Categories across departments...');
     for (const cat of INITIAL_CATEGORIES) {
       await setDoc(doc(db, 'categories', cat.id), cat);
-      console.log(`  -> [${cat.section}] ${cat.name} (Priority: ${cat.priorityOrder})`);
+      console.log(`  -> [${cat.department}] ${cat.name} (Priority: ${cat.priorityOrder})`);
     }
-    console.log('✅ All 14 sectioned categories seeded successfully!');
+    console.log('✅ All categories seeded successfully!');
 
-    // 3. Seed 25+ Nepali Products
-    console.log('🛒 Seeding 25+ Nepali Products...');
+    // 3. Seed Products
+    console.log('🛒 Seeding Products...');
     for (const prod of INITIAL_PRODUCTS) {
       await setDoc(doc(db, 'products', prod.id), prod);
-      console.log(`  -> Product: ${prod.name} | Rs. ${prod.sellingPrice} (Tag: ${prod.shelfTag || 'general'})`);
+      console.log(`  -> Product: ${prod.name} | Rs. ${prod.sellingPrice} (Dept: ${prod.department})`);
     }
-    console.log('✅ All 25+ products seeded successfully!');
+    console.log('✅ All products seeded successfully!');
 
     console.log('\n🎉 GOZI FIRESTORE SEEDING COMPLETED CLEANLY!');
     process.exit(0);

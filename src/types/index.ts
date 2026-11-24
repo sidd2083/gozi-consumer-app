@@ -26,13 +26,18 @@ export interface UserProfile {
   createdAt: string;
 }
 
-export type CategorySection = 'Grocery & Kitchen' | 'Snacks & Drinks' | 'Beauty, Skin Care & Household';
+export type DepartmentName =
+  | 'Grocery & Kitchen'
+  | 'Snacks & Drinks'
+  | 'Beverages & Smokes'
+  | 'Late Night Craving Combo'
+  | 'Beauty & Personal Care';
 
 export interface Category {
   id: string;
   name: string;
   imageUrl: string;
-  section: CategorySection;
+  department: DepartmentName;
   priorityOrder: number;
   isActive: boolean;
 }
@@ -42,6 +47,7 @@ export interface Product {
   name: string;
   description: string;
   categoryId: string;
+  department: DepartmentName;
   unit: string;
   mrp: number;
   sellingPrice: number;
@@ -49,9 +55,9 @@ export interface Product {
   images: string[];
   inStock: boolean;
   isHidden: boolean;
-  isBestseller: boolean;
+  isTrending: boolean;
+  isCombo?: boolean;
   storeId: string;
-  shelfTag?: 'trending' | 'snacks' | 'morning' | 'beauty' | 'general';
   createdAt: string;
   updatedAt: string;
 }

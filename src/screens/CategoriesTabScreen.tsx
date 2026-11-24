@@ -8,6 +8,7 @@ import {
   Image,
   StyleSheet,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import { colors } from '../constants/theme';
 import { ProductCard } from '../components/ProductCard';
@@ -18,6 +19,14 @@ import { Category, Product } from '../types';
 interface CategoriesTabScreenProps {
   initialCategoryId?: string;
 }
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Screen layout: left rail is 80px. Right feed width = SCREEN_WIDTH - 80.
+// Padding on left & right of rightFeed is 10px each = 20px.
+// Gap between 2 columns = 8px.
+// Exact card width = (SCREEN_WIDTH - 80 - 20 - 8) / 2.
+const RIGHT_FEED_WIDTH = SCREEN_WIDTH - 80;
+const COLUMN_CARD_WIDTH = Math.floor((RIGHT_FEED_WIDTH - 28) / 2);
 
 export const CategoriesTabScreen: React.FC<CategoriesTabScreenProps> = ({
   initialCategoryId,
@@ -52,17 +61,17 @@ export const CategoriesTabScreen: React.FC<CategoriesTabScreenProps> = ({
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Top Header */}
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>All Categories</Text>
         <Text style={styles.headerSub}>
-          {activeCategory?.name || 'Browse items'}
+          {activeCategory ? `${activeCategory.department} • ${activeCategory.name}` : 'Browse'}
         </Text>
       </View>
 
-      {/* Main Split Layout: Left Rail + Right Product Grid */}
+      {/* Split Rail Layout */}
       <View style={styles.splitBody}>
-        {/* Left Vertical Rail (76px - 80px) */}
+        {/* Left Category Rail */}
         <View style={styles.leftRail}>
           <ScrollView showsVerticalScrollIndicator={false}>
             {categories.map((cat) => {
@@ -77,7 +86,6 @@ export const CategoriesTabScreen: React.FC<CategoriesTabScreenProps> = ({
                   ]}
                   onPress={() => setActiveCategoryId(cat.id)}
                 >
-                  {/* Green left edge indicator */}
                   {isSelected && <View style={styles.activeIndicator} />}
 
                   <View
@@ -108,7 +116,7 @@ export const CategoriesTabScreen: React.FC<CategoriesTabScreenProps> = ({
           </ScrollView>
         </View>
 
-        {/* Right 2-Column Product Grid */}
+        {/* Right 2-Column Responsive Grid (Max 2 columns, zero overflow) */}
         <View style={styles.rightFeed}>
           <FlatList
             data={products}
@@ -120,7 +128,7 @@ export const CategoriesTabScreen: React.FC<CategoriesTabScreenProps> = ({
             ListHeaderComponent={
               <View style={styles.feedHeader}>
                 <Text style={styles.feedCountText}>
-                  {products.length} {products.length === 1 ? 'Product' : 'Products'} available
+                  {products.length} {products.length === 1 ? 'Item' : 'Items'} available
                 </Text>
               </View>
             }
@@ -135,7 +143,7 @@ export const CategoriesTabScreen: React.FC<CategoriesTabScreenProps> = ({
             renderItem={({ item }) => (
               <ProductCard
                 product={item}
-                width="48.5%"
+                width={COLUMN_CARD_WIDTH}
                 onPress={() => setSelectedProduct(item)}
               />
             )}
@@ -161,10 +169,10 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#FFFFFF',
     paddingTop: 50,
-    paddingBottom: 12,
+    paddingBottom: 10,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#F3F4F6',
   },
   headerTitle: {
     fontSize: 18,
@@ -173,7 +181,7 @@ const styles = StyleSheet.create({
   },
   headerSub: {
     fontSize: 12,
-    color: '#0C831F',
+    color: colors.brandGreenDark,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -182,14 +190,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   leftRail: {
-    width: 82,
+    width: 80,
     backgroundColor: '#F8FAFC',
     borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
+    borderRightColor: '#E8ECF4',
   },
   railItem: {
     paddingVertical: 10,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     alignItems: 'center',
     position: 'relative',
   },
@@ -202,15 +210,15 @@ const styles = StyleSheet.create({
     top: 8,
     bottom: 8,
     width: 3.5,
-    backgroundColor: '#0C831F',
+    backgroundColor: colors.brandGreen,
     borderTopRightRadius: 4,
     borderBottomRightRadius: 4,
   },
   railThumbnailBox: {
-    width: 50,
-    height: 50,
+    width: 48,
+    height: 48,
     borderRadius: 14,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -218,8 +226,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   railThumbnailBoxSelected: {
-    borderColor: '#0C831F',
-    backgroundColor: '#ECFDF5',
+    borderColor: colors.brandGreen,
+    backgroundColor: colors.brandGreenSubtle,
   },
   railThumbnail: {
     width: '90%',
@@ -235,28 +243,29 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
   railLabelSelected: {
-    color: '#0C831F',
+    color: colors.brandGreenDark,
     fontWeight: '800',
   },
   rightFeed: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
   },
   feedScrollContent: {
     padding: 10,
-    paddingBottom: 110,
+    paddingBottom: 120,
   },
   feedColumnWrapper: {
     justifyContent: 'space-between',
+    marginBottom: 4,
   },
   feedHeader: {
     marginBottom: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   feedCountText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#4B5563',
+    color: '#6B7280',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -272,7 +281,7 @@ const styles = StyleSheet.create({
   },
   emptySub: {
     fontSize: 12.5,
-    color: '#4B5563',
+    color: '#6B7280',
     textAlign: 'center',
   },
 });

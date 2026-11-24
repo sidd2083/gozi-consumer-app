@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  Animated,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppContextProvider, useApp } from './src/context/AppContext';
 import { CartProvider } from './src/context/CartContext';
@@ -11,6 +18,7 @@ import { CartScreen } from './src/screens/CartScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
 import { OrderTrackingScreen } from './src/screens/OrderTrackingScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { AddressSelectorModal } from './src/components/AddressSelectorModal';
 import { BottomNavBar, TabName } from './src/components/BottomNavBar';
 import { FloatingCartBar } from './src/components/FloatingCartBar';
 
@@ -21,10 +29,51 @@ function MainAppShell() {
   const [activeTab, setActiveTab] = useState<TabName>('home');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
-
   const [profileOpen, setProfileOpen] = useState(false);
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
+
+  // Scroll Reactive Dock Animation (Zepto Style)
+  // translateY: 0 = visible, 100 = slid down & hidden
+  const dockAnim = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const isDockHidden = useRef(false);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const diff = currentY - lastScrollY.current;
+
+    // Only react after user has scrolled past header (y > 60)
+    if (currentY > 60) {
+      if (diff > 8 && !isDockHidden.current) {
+        // Scrolling DOWN -> Slide dock down smoothly
+        isDockHidden.current = true;
+        Animated.timing(dockAnim, {
+          toValue: 100,
+          duration: 220,
+          useNativeDriver: true,
+        }).start();
+      } else if (diff < -8 && isDockHidden.current) {
+        // Scrolling UP -> Slide dock back up smoothly
+        isDockHidden.current = false;
+        Animated.timing(dockAnim, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else if (isDockHidden.current) {
+      // Near top of screen -> Always reveal dock
+      isDockHidden.current = false;
+      Animated.timing(dockAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    lastScrollY.current = currentY;
+  };
 
   // 1. Splash Screen Gate
   if (showSplash) {
@@ -45,7 +94,7 @@ function MainAppShell() {
     return <OnboardingFlow onSuccess={() => setActiveTab('home')} />;
   }
 
-  // 4. Profile Screen
+  // 4. Overlays: Profile
   if (profileOpen) {
     return (
       <ProfileScreen
@@ -59,7 +108,7 @@ function MainAppShell() {
     );
   }
 
-  // 5. Search Screen
+  // 5. Overlays: Search
   if (searchOpen) {
     return (
       <SearchScreen
@@ -72,7 +121,7 @@ function MainAppShell() {
     );
   }
 
-  // 6. Live Tracking
+  // 6. Overlays: Live Order Tracking
   if (trackingOrderId) {
     return (
       <OrderTrackingScreen
@@ -98,6 +147,7 @@ function MainAppShell() {
             onNavigateToSearch={() => setSearchOpen(true)}
             onNavigateToProfile={() => setProfileOpen(true)}
             onOpenAddressSelector={() => setAddressModalVisible(true)}
+            onScroll={handleScroll}
           />
         );
       case 'categories':
@@ -119,23 +169,40 @@ function MainAppShell() {
     <View style={styles.container}>
       <View style={styles.tabContent}>{renderTabContent()}</View>
 
-      {/* Floating View Cart Pill (if items exist and not on Cart tab) */}
+      {/* Coordinated Floating Cart Summary Bar (slides with dock) */}
       {activeTab !== 'cart' && (
         <FloatingCartBar
           onPress={() => setActiveTab('cart')}
-          bottomOffset={68}
+          translateY={dockAnim}
+          bottomOffset={84}
         />
       )}
 
-      {/* Persistent Bottom Nav Bar */}
+      {/* Floating Curved Pill Bottom Dock Menu */}
       <BottomNavBar
         currentTab={activeTab}
+        translateY={dockAnim}
         onSelectTab={(tab) => {
           if (tab !== 'categories') {
             setSelectedCategoryId('');
           }
           setActiveTab(tab);
+          // Show dock if switched
+          if (isDockHidden.current) {
+            isDockHidden.current = false;
+            Animated.timing(dockAnim, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            }).start();
+          }
         }}
+      />
+
+      {/* Address Selector Modal */}
+      <AddressSelectorModal
+        visible={addressModalVisible}
+        onClose={() => setAddressModalVisible(false)}
       />
     </View>
   );
