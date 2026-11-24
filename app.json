@@ -1,25 +1,61 @@
 {
   "expo": {
-    "name": "gozi-consumer-app",
+    "name": "Gozi",
     "slug": "gozi-consumer-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#38B29C"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gozi.consumer",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Gozi uses your location to deliver groceries and daily essentials in 10 minutes to your exact doorstep."
+      }
     },
     "android": {
+      "package": "com.gozi.consumer",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#38B29C",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDkyo7HCnxjlNUdTWenoNsHWDboecAHgdM"
+        }
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Gozi to pinpoint your doorstep for 10-minute delivery."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#38B29C"
+        }
+      ]
+    ]
   }
 }

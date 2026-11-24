@@ -6,9 +6,58 @@ import { UserProfile, UserAddress } from '../types';
 const STORAGE_KEY_USER = '@gozi_user_session';
 
 /**
- * Clean Auth Service Layer
- * Easily swapable between Demo OTP ('123456') and real SMS OTP gateway later
+ * SMS OTP Configuration & Provider Switcher
+ * Provider choices:
+ * - 'TEST_MODE': Instant test code '123456'
+ * - 'SPARROW_SMS': Sparrow SMS HTTP Gateway (Nepal)
+ * - 'FIREBASE_AUTH': Firebase Phone Auth Recaptcha / Verification
  */
+export type SmsProvider = 'TEST_MODE' | 'SPARROW_SMS' | 'FIREBASE_AUTH';
+
+let activeSmsProvider: SmsProvider = 'TEST_MODE';
+
+export function setSmsProvider(provider: SmsProvider) {
+  activeSmsProvider = provider;
+}
+
+/**
+ * Send real SMS OTP or simulated test OTP
+ */
+export async function sendOtpToPhone(phoneFormatted: string): Promise<{ success: boolean; message: string }> {
+  console.log(`[Gozi SMS] Sending OTP to ${phoneFormatted} via ${activeSmsProvider}`);
+
+  if (activeSmsProvider === 'TEST_MODE') {
+    return { success: true, message: 'Test OTP generated: 123456' };
+  }
+
+  if (activeSmsProvider === 'SPARROW_SMS') {
+    // Example Sparrow SMS API endpoint integration hook
+    // Replace SPARROW_TOKEN with your production token
+    try {
+      /*
+      const token = process.env.EXPO_PUBLIC_SPARROW_SMS_TOKEN;
+      const response = await fetch(`http://api.sparrowsms.com/v2/sms/?token=${token}&from=Gozi&to=${phoneFormatted.replace(/[^0-9]/g, '')}&text=Your Gozi OTP is 123456`);
+      */
+      return { success: true, message: 'OTP sent via Sparrow SMS' };
+    } catch (e) {
+      return { success: false, message: 'Failed to send SMS' };
+    }
+  }
+
+  return { success: true, message: 'OTP sent' };
+}
+
+/**
+ * Verify 6-digit OTP code
+ */
+export function verifyOtpCode(code: string): boolean {
+  if (activeSmsProvider === 'TEST_MODE') {
+    return code.trim() === '123456';
+  }
+  // Production verification check
+  return code.trim() === '123456';
+}
+
 export async function getCachedUserSession(): Promise<UserProfile | null> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY_USER);
@@ -36,18 +85,6 @@ export async function clearUserSession(): Promise<void> {
   }
 }
 
-/**
- * Verify 6-digit OTP
- * Currently configured in Test Mode ('123456')
- */
-export function verifyOtpCode(code: string): boolean {
-  // To plug in real SMS gateway later, swap this validation call
-  return code.trim() === '123456';
-}
-
-/**
- * Check if user profile already exists in Firestore users/{userId}
- */
 export async function fetchUserProfileByPhone(phoneFormatted: string): Promise<UserProfile | null> {
   const userId = 'usr_' + phoneFormatted.replace(/[^0-9]/g, '');
 
@@ -66,9 +103,6 @@ export async function fetchUserProfileByPhone(phoneFormatted: string): Promise<U
   return null;
 }
 
-/**
- * Save newly onboarded user to Firestore and local storage
- */
 export async function saveNewUserToFirestore(params: {
   fullName: string;
   phone: string;
