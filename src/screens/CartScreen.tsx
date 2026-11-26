@@ -83,7 +83,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({
         status: 'placed',
         riderId: null,
         riderDetails: null,
-        storeId: 'store-ktm-central',
+        storeId: 'store-hetauda-main',
       });
 
       // Clear the cart upon successful placement
@@ -147,7 +147,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Delivery Guarantee Pill */}
         <View style={styles.deliveryBadgeBox}>
-          <Clock size={16} color="#0C831F" />
+          <Clock size={16} color={colors.brandGreenDark} />
           <Text style={styles.deliveryBadgeText}>
             Delivery in {appConfig.estimatedMinutes} minutes to your doorstep
           </Text>
@@ -260,7 +260,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({
           <Text style={styles.cardHeader}>Payment Option</Text>
           <View style={styles.paymentBox}>
             <View style={styles.paymentIconBox}>
-              <Banknote size={20} color="#0C831F" />
+              <Banknote size={20} color={colors.brandGreen} />
             </View>
             <View style={styles.paymentMeta}>
               <Text style={styles.paymentTitle}>Cash on Delivery (COD)</Text>
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   deliveryBadgeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.brandGreenLight,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
   deliveryBadgeText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0C831F',
+    color: colors.brandGreenDark,
   },
   card: {
     backgroundColor: '#FFFFFF',

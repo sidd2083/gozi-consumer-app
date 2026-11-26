@@ -1,21 +1,21 @@
 /**
- * Gozi Official Brand Design System
- * Primary Green extracted directly from circular Gozi logo: #38B29C / #32A08C
- * Accent Orange from 'g' letter: #FF6B35
- * Backgrounds: Pre-home full green (#38B29C), Home clean white (#FFFFFF)
- * NO RED left on bottom navigation, icons, or badges.
+ * Gozii Official Brand Design System
+ * Primary Green: Exact teal-green from circular Gozii logo: #27A98C / #25A689
+ * Accent Orange: Orange from 'g' letter: #F26A1B
+ * Surfaces: Canvas #FFFFFF, Subtle surface #F8FAFC
+ * ZERO Emojis across UI labels & ZERO RED on bottom navigation, icons, or badges.
  */
 
 export const colors = {
-  // Exact Gozi Logo Green
-  brandGreen: '#38B29C',
-  brandGreenDark: '#2C8E7C',
-  brandGreenLight: '#E8F7F4',
-  brandGreenSubtle: '#F0FAF8',
+  // Exact Gozii Logo Teal Green
+  brandGreen: '#27A98C',
+  brandGreenDark: '#1E8B72',
+  brandGreenLight: '#E6F7F3',
+  brandGreenSubtle: '#F0FAF7',
 
-  // Logo Accent Orange
-  brandOrange: '#FF6B35',
-  brandOrangeLight: '#FFF2EB',
+  // Logo Accent Orange ('g')
+  brandOrange: '#F26A1B',
+  brandOrangeLight: '#FFF2E8',
 
   // Surfaces
   canvas: '#FFFFFF',
@@ -24,7 +24,7 @@ export const colors = {
   cardSurfaceMuted: '#F8FAFC',
 
   // Borders
-  border: '#E8ECF4',
+  border: '#E5E7EB',
   borderLight: '#F3F4F6',
 
   // Typography Ink
@@ -33,10 +33,10 @@ export const colors = {
   textMuted: '#9CA3AF',
   textWhite: '#FFFFFF',
 
-  // Commerce & Status (All Green-first, Zero Red on bottom bar/icons)
-  primary: '#38B29C',
-  primaryDark: '#2C8E7C',
+  // Commerce & Status (Green-first)
+  primary: '#27A98C',
+  primaryDark: '#1E8B72',
   discountBlue: '#2563EB',
-  badgeGreen: '#38B29C',
+  badgeGreen: '#27A98C',
   stockOut: '#9CA3AF',
 };

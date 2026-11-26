@@ -175,7 +175,7 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({
             </View>
 
             <View style={styles.timerBadge}>
-              <Clock size={14} color="#0C831F" />
+              <Clock size={14} color={colors.brandGreenDark} />
               <Text style={styles.timerText}>
                 {order.status === 'delivered' ? 'ARRIVED' : '10 MINS'}
               </Text>
@@ -246,7 +246,8 @@ export const OrderTrackingScreen: React.FC<OrderTrackingScreenProps> = ({
           <View style={styles.addressMetaRow}>
             <MapPin size={16} color={colors.primary} />
             <Text numberOfLines={2} style={styles.addressText}>
-              {order.deliveryAddress.fullAddress} ({order.deliveryAddress.landmark})
+              {order.deliveryAddress?.fullAddress || order.address?.fullAddress || 'Delivery Address'}
+              {order.deliveryAddress?.landmark ? ` (${order.deliveryAddress.landmark})` : ''}
             </Text>
           </View>
         </View>
@@ -450,7 +451,7 @@ const styles = StyleSheet.create({
   timerText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#0C831F',
+    color: colors.brandGreenDark,
   },
   progressBarWrapper: {
     flexDirection: 'row',

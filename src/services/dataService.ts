@@ -1,16 +1,16 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   collection, 
   doc, 
   onSnapshot, 
   setDoc, 
-  updateDoc, 
   query, 
   where, 
   orderBy,
   getDocs,
   getDoc
 } from 'firebase/firestore';
-import { db, isFirebaseConnected } from '../services/firebase';
+import { db, isFirebaseConnected } from './firebase';
 import { 
   INITIAL_APP_CONFIG, 
   INITIAL_CATEGORIES, 
@@ -19,18 +19,15 @@ import {
 } from '../mock/mockData';
 import { Category, Product, AppConfig, Order, UserProfile, OrderStatus } from '../types';
 
-/**
- * Data Service with Real Firestore Subscription + Mock In-Memory Fallback
- * Ensures 100% offline & instant development velocity while keeping real
- * Firestore live synchronizations fully operational.
- */
+const STORAGE_KEY_CATEGORIES = '@gozii_catalog_categories';
+const STORAGE_KEY_PRODUCTS = '@gozii_catalog_products';
+const STORAGE_KEY_CATALOG_VER = '@gozii_catalog_ver';
 
-// In-Memory state for mock fallback mode
-let mockCategories = [...INITIAL_CATEGORIES];
-let mockProducts = [...INITIAL_PRODUCTS];
-let mockConfig = { ...INITIAL_APP_CONFIG };
-let mockOrders: Order[] = [];
-let mockUser: UserProfile = { ...INITIAL_USER };
+// In-Memory state for instant UI delivery
+let inMemoryCategories = [...INITIAL_CATEGORIES];
+let inMemoryProducts = [...INITIAL_PRODUCTS];
+let inMemoryConfig = { ...INITIAL_APP_CONFIG };
+let inMemoryOrders: Order[] = [];
 
 const listeners = {
   categories: new Set<(data: Category[]) => void>(),
@@ -41,30 +38,63 @@ const listeners = {
 };
 
 /**
- * Subscribe to App Settings (deliveryFee, etc.)
+ * Initialize Cache-First Catalog from AsyncStorage
+ */
+async function loadCachedCatalog() {
+  try {
+    const [cachedCats, cachedProds] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY_CATEGORIES),
+      AsyncStorage.getItem(STORAGE_KEY_PRODUCTS),
+    ]);
+    if (cachedCats) {
+      inMemoryCategories = JSON.parse(cachedCats);
+    }
+    if (cachedProds) {
+      inMemoryProducts = JSON.parse(cachedProds);
+    }
+  } catch (e) {
+    console.warn('[Gozii DataService] Error loading cached catalog:', e);
+  }
+}
+loadCachedCatalog();
+
+/**
+ * Subscribe to App Settings & Catalog Version Check (1 tiny doc read)
  */
 export function subscribeAppConfig(callback: (config: AppConfig) => void): () => void {
   if (isFirebaseConnected && db) {
     try {
       const docRef = doc(db, 'settings', 'appConfig');
-      const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      const unsubscribe = onSnapshot(docRef, async (snapshot) => {
         if (snapshot.exists()) {
-          callback(snapshot.data() as AppConfig);
+          const cfg = snapshot.data() as AppConfig;
+          callback(cfg);
+          inMemoryConfig = cfg;
+
+          // Check if remote catalogVersion changed
+          try {
+            const localVer = await AsyncStorage.getItem(STORAGE_KEY_CATALOG_VER);
+            const remoteVer = cfg.catalogVersion?.toString() || '1';
+            if (localVer !== remoteVer) {
+              await refreshCatalogFromFirestore(remoteVer);
+            }
+          } catch (e) {
+            console.warn('[Gozii DataService] Catalog version sync check error:', e);
+          }
         } else {
           callback(INITIAL_APP_CONFIG);
         }
       }, (err) => {
-        console.warn('[Gozi DataService] Firestore config listen error, using fallback:', err);
-        callback(mockConfig);
+        console.warn('[Gozii DataService] Firestore config listen error, using fallback:', err);
+        callback(inMemoryConfig);
       });
       return unsubscribe;
     } catch (e) {
-      console.warn('[Gozi DataService] Exception setting up config listener:', e);
+      console.warn('[Gozii DataService] Exception setting up config listener:', e);
     }
   }
 
-  // Mock Fallback
-  callback(mockConfig);
+  callback(inMemoryConfig);
   listeners.config.add(callback);
   return () => {
     listeners.config.delete(callback);
@@ -72,9 +102,44 @@ export function subscribeAppConfig(callback: (config: AppConfig) => void): () =>
 }
 
 /**
- * Subscribe to Categories sorted by priorityOrder
+ * Refresh Catalog docs from Firestore when catalogVersion changes
+ */
+async function refreshCatalogFromFirestore(newVersion: string) {
+  if (!isFirebaseConnected || !db) return;
+  try {
+    const catsSnap = await getDocs(
+      query(collection(db, 'categories'), where('isActive', '==', true), orderBy('priorityOrder', 'asc'))
+    );
+    if (!catsSnap.empty) {
+      const freshCats = catsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Category));
+      inMemoryCategories = freshCats;
+      await AsyncStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(freshCats));
+      listeners.categories.forEach(cb => cb(freshCats));
+    }
+
+    const prodsSnap = await getDocs(
+      query(collection(db, 'products'), where('isHidden', '==', false))
+    );
+    if (!prodsSnap.empty) {
+      const freshProds = prodsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+      inMemoryProducts = freshProds;
+      await AsyncStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(freshProds));
+      listeners.products.forEach(cb => cb(freshProds));
+    }
+
+    await AsyncStorage.setItem(STORAGE_KEY_CATALOG_VER, newVersion);
+  } catch (e) {
+    console.warn('[Gozii DataService] Error refreshing catalog from Firestore:', e);
+  }
+}
+
+/**
+ * Subscribe to Categories (Cache-First Instant Load)
  */
 export function subscribeCategories(callback: (categories: Category[]) => void): () => void {
+  // 1. Immediately fire in-memory / cached categories (< 10ms)
+  callback(inMemoryCategories);
+
   if (isFirebaseConnected && db) {
     try {
       const colRef = collection(db, 'categories');
@@ -82,22 +147,22 @@ export function subscribeCategories(callback: (categories: Category[]) => void):
       const unsubscribe = onSnapshot(q, (snapshot) => {
         if (!snapshot.empty) {
           const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Category));
+          inMemoryCategories = items;
+          AsyncStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(items)).catch(() => {});
           callback(items);
         } else {
-          callback(mockCategories);
+          callback(inMemoryCategories);
         }
       }, (err) => {
-        console.warn('[Gozi DataService] Firestore categories error, using fallback:', err);
-        callback(mockCategories);
+        console.warn('[Gozii DataService] Firestore categories listen error:', err);
+        callback(inMemoryCategories);
       });
       return unsubscribe;
     } catch (e) {
-      console.warn('[Gozi DataService] Category setup error:', e);
+      console.warn('[Gozii DataService] Category setup error:', e);
     }
   }
 
-  // Mock Fallback
-  callback(mockCategories);
   listeners.categories.add(callback);
   return () => {
     listeners.categories.delete(callback);
@@ -105,12 +170,21 @@ export function subscribeCategories(callback: (categories: Category[]) => void):
 }
 
 /**
- * Subscribe to Products (filterable by category or all)
+ * Subscribe to Products (Cache-First with targeted filtering)
  */
 export function subscribeProducts(
   categoryId: string | null,
   callback: (products: Product[]) => void
 ): () => void {
+  const getFiltered = () => {
+    return categoryId 
+      ? inMemoryProducts.filter(p => p.categoryId === categoryId && !p.isHidden)
+      : inMemoryProducts.filter(p => !p.isHidden);
+  };
+
+  // 1. Immediately fire in-memory / cached products (< 10ms)
+  callback(getFiltered());
+
   if (isFirebaseConnected && db) {
     try {
       const colRef = collection(db, 'products');
@@ -121,36 +195,25 @@ export function subscribeProducts(
       const unsubscribe = onSnapshot(q, (snapshot) => {
         if (!snapshot.empty) {
           const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+          if (!categoryId) {
+            inMemoryProducts = items;
+            AsyncStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(items)).catch(() => {});
+          }
           callback(items);
         } else {
-          const filtered = categoryId 
-            ? mockProducts.filter(p => p.categoryId === categoryId && !p.isHidden)
-            : mockProducts.filter(p => !p.isHidden);
-          callback(filtered);
+          callback(getFiltered());
         }
       }, (err) => {
-        console.warn('[Gozi DataService] Firestore products error, using fallback:', err);
-        const filtered = categoryId 
-          ? mockProducts.filter(p => p.categoryId === categoryId && !p.isHidden)
-          : mockProducts.filter(p => !p.isHidden);
-        callback(filtered);
+        console.warn('[Gozii DataService] Firestore products listen error:', err);
+        callback(getFiltered());
       });
       return unsubscribe;
     } catch (e) {
-      console.warn('[Gozi DataService] Products setup error:', e);
+      console.warn('[Gozii DataService] Products setup error:', e);
     }
   }
 
-  // Mock Fallback
-  const notify = () => {
-    const filtered = categoryId 
-      ? mockProducts.filter(p => p.categoryId === categoryId && !p.isHidden)
-      : mockProducts.filter(p => !p.isHidden);
-    callback(filtered);
-  };
-  notify();
-
-  const listener = () => notify();
+  const listener = () => callback(getFiltered());
   listeners.products.add(listener);
   return () => {
     listeners.products.delete(listener);
@@ -173,20 +236,17 @@ export async function placeOrder(orderData: Omit<Order, 'id' | 'createdAt' | 'up
   if (isFirebaseConnected && db) {
     try {
       await setDoc(doc(db, 'orders', orderId), fullOrder);
-      console.log('[Gozi DataService] Order placed in Firestore:', orderId);
+      console.log('[Gozii DataService] Order placed in Firestore:', orderId);
       return orderId;
     } catch (e) {
-      console.warn('[Gozi DataService] Failed to place order in Firestore, falling back to mock:', e);
+      console.warn('[Gozii DataService] Failed to place order in Firestore, falling back to mock:', e);
     }
   }
 
-  // Mock Store
-  mockOrders.unshift(fullOrder);
-  listeners.userOrders.forEach(cb => cb([...mockOrders]));
+  inMemoryOrders.unshift(fullOrder);
+  listeners.userOrders.forEach(cb => cb([...inMemoryOrders]));
   
-  // Trigger simulated progression for demo testing if needed
   startDemoOrderProgression(orderId);
-
   return orderId;
 }
 
@@ -201,22 +261,21 @@ export function subscribeOrder(orderId: string, callback: (order: Order | null) 
         if (snapshot.exists()) {
           callback({ id: snapshot.id, ...snapshot.data() } as Order);
         } else {
-          const found = mockOrders.find(o => o.id === orderId) || null;
+          const found = inMemoryOrders.find(o => o.id === orderId) || null;
           callback(found);
         }
       }, (err) => {
-        console.warn('[Gozi DataService] Firestore order listen error:', err);
-        const found = mockOrders.find(o => o.id === orderId) || null;
+        console.warn('[Gozii DataService] Firestore order listen error:', err);
+        const found = inMemoryOrders.find(o => o.id === orderId) || null;
         callback(found);
       });
       return unsubscribe;
     } catch (e) {
-      console.warn('[Gozi DataService] Order subscribe exception:', e);
+      console.warn('[Gozii DataService] Order subscribe exception:', e);
     }
   }
 
-  // Mock
-  const found = mockOrders.find(o => o.id === orderId) || null;
+  const found = inMemoryOrders.find(o => o.id === orderId) || null;
   callback(found);
 
   if (!listeners.orders.has(orderId)) {
@@ -241,16 +300,16 @@ export function subscribeUserOrders(userId: string, callback: (orders: Order[]) 
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Order));
         callback(list);
       }, (err) => {
-        console.warn('[Gozi DataService] Firestore user orders error:', err);
-        callback(mockOrders.filter(o => o.userId === userId));
+        console.warn('[Gozii DataService] Firestore user orders error:', err);
+        callback(inMemoryOrders.filter(o => o.userId === userId));
       });
       return unsubscribe;
     } catch (e) {
-      console.warn('[Gozi DataService] User orders exception:', e);
+      console.warn('[Gozii DataService] User orders exception:', e);
     }
   }
 
-  callback(mockOrders.filter(o => o.userId === userId));
+  callback(inMemoryOrders.filter(o => o.userId === userId));
   listeners.userOrders.add(callback);
   return () => {
     listeners.userOrders.delete(callback);
@@ -258,7 +317,7 @@ export function subscribeUserOrders(userId: string, callback: (orders: Order[]) 
 }
 
 /**
- * Demo Simulation Helper: Simulates rider progression for mock testing
+ * Demo Simulation Helper for offline/test environments
  */
 function startDemoOrderProgression(orderId: string) {
   const steps: { status: OrderStatus; delay: number; rider?: any }[] = [
@@ -270,8 +329,8 @@ function startDemoOrderProgression(orderId: string) {
         name: 'Suman Thapa', 
         phone: '+977 9841234567', 
         photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-        lat: 27.7180,
-        lng: 85.3235,
+        lat: 27.4250,
+        lng: 85.0380,
       } 
     },
     { 
@@ -281,8 +340,8 @@ function startDemoOrderProgression(orderId: string) {
         name: 'Suman Thapa', 
         phone: '+977 9841234567', 
         photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-        lat: 27.7210,
-        lng: 85.3209,
+        lat: 27.4280,
+        lng: 85.0340,
       } 
     },
     { status: 'delivered', delay: 22000 },
@@ -290,21 +349,19 @@ function startDemoOrderProgression(orderId: string) {
 
   steps.forEach(({ status, delay, rider }) => {
     setTimeout(() => {
-      const order = mockOrders.find(o => o.id === orderId);
+      const order = inMemoryOrders.find(o => o.id === orderId);
       if (order) {
         order.status = status;
         if (rider) {
-          order.riderDetails = rider;
-          order.riderId = 'rider-suman-1';
+          order.rider = rider;
         }
         order.updatedAt = new Date().toISOString();
 
-        // Notify subscribers
         const subscribers = listeners.orders.get(orderId);
         if (subscribers) {
           subscribers.forEach(cb => cb({ ...order }));
         }
-        listeners.userOrders.forEach(cb => cb([...mockOrders]));
+        listeners.userOrders.forEach(cb => cb([...inMemoryOrders]));
       }
     }, delay);
   });

@@ -4,6 +4,7 @@ import { Minus, Plus } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Product } from '../types';
 import { useCart } from '../context/CartContext';
+import { colors } from '../constants/theme';
 
 interface ProductCardProps {
   product: Product;
@@ -219,14 +220,14 @@ const styles = StyleSheet.create({
     height: 28,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#38B29C', // Brand Green
+    borderColor: colors.brandGreen,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
   },
   addButtonText: {
-    color: '#38B29C',
+    color: colors.brandGreen,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.4,
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
   stepperContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#38B29C',
+    backgroundColor: colors.brandGreen,
     borderRadius: 6,
     height: 28,
     paddingHorizontal: 4,

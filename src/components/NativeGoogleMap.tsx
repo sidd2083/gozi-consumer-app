@@ -60,7 +60,7 @@ export const NativeGoogleMap: React.FC<NativeGoogleMapProps> = ({
           <View style={styles.pinBubble}>
             <Text style={styles.pinBubbleText}>Move map to pin gate</Text>
           </View>
-          <MapPin size={36} color="#EF4444" />
+          <MapPin size={36} color="#27A98C" />
         </View>
       </View>
     );
@@ -75,7 +75,7 @@ export const NativeGoogleMap: React.FC<NativeGoogleMapProps> = ({
         <View style={styles.pinBubble}>
           <Text style={styles.pinBubbleText}>Pin Doorstep Gate</Text>
         </View>
-        <MapPin size={38} color="#EF4444" />
+        <MapPin size={38} color="#27A98C" />
       </View>
     </View>
   );

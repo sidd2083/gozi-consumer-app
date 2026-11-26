@@ -10,20 +10,28 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  Dimensions,
+  Platform,
 } from 'react-native';
-import { ArrowRight, MapPin, X, Check, Navigation } from 'lucide-react-native';
+import { ArrowRight, MapPin, X, Check, Navigation, Search, CheckCircle } from 'lucide-react-native';
 import * as Location from 'expo-location';
+import MapView, { Marker } from 'react-native-maps';
 import { GoziLogo } from '../components/GoziLogo';
+import { NepalMapIcon } from '../components/NepalMapIcon';
+import { colors } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import {
   verifyOtpCode,
   fetchUserProfileByPhone,
   saveNewUserToFirestore,
 } from '../services/authService';
+import { reverseGeocodeToReadable, DARK_STORE_COORDS } from '../utils/geo';
 
 interface OnboardingFlowProps {
   onSuccess: () => void;
 }
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => {
   const { completeOnboarding } = useApp();
@@ -41,12 +49,27 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
   // Name & Address input
   const [fullName, setFullName] = useState('');
   const [addressText, setAddressText] = useState('');
-  const [coords, setCoords] = useState<{ lat: number; lng: number }>({ lat: 27.4287, lng: 85.0331 });
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
+    lat: DARK_STORE_COORDS.lat,
+    lng: DARK_STORE_COORDS.lng,
+  });
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   // Map Picker Modal State
   const [mapModalVisible, setMapModalVisible] = useState(false);
-  const [tempSearchQuery, setTempSearchQuery] = useState('');
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 27.4287,
+    longitude: 85.0331,
+    latitudeDelta: 0.015,
+    longitudeDelta: 0.015,
+  });
+  const [pinnedCoords, setPinnedCoords] = useState({
+    latitude: 27.4287,
+    longitude: 85.0331,
+  });
+  const [tempAddressName, setTempAddressName] = useState('School Road, Hetauda-4');
+  const [isGeocodingPin, setIsGeocodingPin] = useState(false);
+  const mapRef = useRef<MapView | null>(null);
 
   // Auto-detect GPS location immediately when Step 4 is reached
   useEffect(() => {
@@ -60,27 +83,34 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
       setIsDetectingLocation(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setAddressText('Hetauda-4, School Road, Makwanpur');
+        const fallbackAddress = 'School Road, Hetauda-4';
+        setAddressText(fallbackAddress);
+        setTempAddressName(fallbackAddress);
         setIsDetectingLocation(false);
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
       const { latitude, longitude } = location.coords;
       setCoords({ lat: latitude, lng: longitude });
+      setPinnedCoords({ latitude, longitude });
+      setMapRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.012,
+        longitudeDelta: 0.012,
+      });
 
-      const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (reverse && reverse.length > 0) {
-        const place = reverse[0];
-        const street = place.street || place.name || '';
-        const city = place.city || place.subregion || place.district || 'Hetauda';
-        setAddressText(`${street}, ${city}`.trim() || 'Hetauda-4, Makwanpur');
-      } else {
-        setAddressText('Hetauda-4, School Road, Makwanpur');
-      }
+      const humanName = await reverseGeocodeToReadable(latitude, longitude);
+      setAddressText(humanName);
+      setTempAddressName(humanName);
       setIsDetectingLocation(false);
     } catch (e) {
-      setAddressText('Hetauda-4, School Road, Makwanpur');
+      const fallback = 'School Road, Hetauda-4';
+      setAddressText(fallback);
+      setTempAddressName(fallback);
       setIsDetectingLocation(false);
     }
   };
@@ -92,7 +122,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
 
   const handleSendOtp = async () => {
     if (!isValidNepaliPhone(phoneNumber)) {
-      Alert.alert('Invalid Number', 'Enter a 10-digit Nepali mobile number (starts with 98 or 97).');
+      Alert.alert('Invalid Mobile Number', 'Please enter a valid 10-digit Nepali number starting with 98 or 97.');
       return;
     }
     setLoading(true);
@@ -121,12 +151,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
   const handleVerifyOtp = async () => {
     const code = otpDigits.join('');
     if (code.length !== 6) {
-      Alert.alert('Incomplete OTP', 'Enter all 6 digits.');
+      Alert.alert('Incomplete OTP', 'Enter all 6 digits of the code.');
       return;
     }
 
     if (!verifyOtpCode(code)) {
-      Alert.alert('Incorrect OTP', 'Test OTP: 123456');
+      Alert.alert('Incorrect OTP', 'Test mode code is 123456');
       return;
     }
 
@@ -135,7 +165,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
 
     try {
       const existingUser = await fetchUserProfileByPhone(formattedPhone);
-      if (existingUser && existingUser.name && existingUser.addresses.length > 0) {
+      if (existingUser && existingUser.name && existingUser.addresses && existingUser.addresses.length > 0) {
         await completeOnboarding(existingUser);
         setLoading(false);
         onSuccess();
@@ -149,13 +179,34 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
     }
   };
 
+  // Map Region Drag / Pin Handler
+  const handleRegionChangeComplete = async (region: any) => {
+    setPinnedCoords({
+      latitude: region.latitude,
+      longitude: region.longitude,
+    });
+    setIsGeocodingPin(true);
+    const readable = await reverseGeocodeToReadable(region.latitude, region.longitude);
+    setTempAddressName(readable);
+    setIsGeocodingPin(false);
+  };
+
+  const handleConfirmMapLocation = () => {
+    setCoords({
+      lat: pinnedCoords.latitude,
+      lng: pinnedCoords.longitude,
+    });
+    setAddressText(tempAddressName);
+    setMapModalVisible(false);
+  };
+
   const handleConfirmProfile = async () => {
     if (!fullName.trim()) {
-      Alert.alert('Name Required', 'Please enter your full name.');
+      Alert.alert('Name Required', 'Please enter your full name to proceed.');
       return;
     }
     if (!addressText.trim()) {
-      Alert.alert('Address Required', 'Please enter your delivery address.');
+      Alert.alert('Address Required', 'Please provide your delivery location.');
       return;
     }
 
@@ -180,7 +231,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
       onSuccess();
     } catch (e) {
       setLoading(false);
-      Alert.alert('Error', 'Could not save profile.');
+      Alert.alert('Error', 'Could not save profile. Please try again.');
     }
   };
 
@@ -191,6 +242,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
       {/* Brand Header */}
       <View style={styles.header}>
         <GoziLogo size={84} />
+        <Text style={styles.headerBrandText}>Gozii</Text>
+        <Text style={styles.headerSubText}>Delivery in 10 mins</Text>
       </View>
 
       <ScrollView
@@ -198,13 +251,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
         contentContainerStyle={styles.scrollBody}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Step 2: Phone */}
+        {/* Step 2: Phone Input (+977 with Nepal Map Outline) */}
         {currentStep === 2 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Enter Mobile Number</Text>
+            <Text style={styles.cardTitle}>Enter Your Mobile Number</Text>
+            <Text style={styles.cardSubtitle}>We will send a 6-digit verification code</Text>
 
             <View style={styles.phoneInputRow}>
+              {/* Nepal +977 Badge with Crisp Nepal Map Vector Icon */}
               <View style={styles.prefixBox}>
+                <NepalMapIcon width={24} height={16} color={colors.brandGreen} />
                 <Text style={styles.prefixText}>+977</Text>
               </View>
               <TextInput
@@ -213,7 +269,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
                 keyboardType="phone-pad"
                 maxLength={10}
                 placeholder="98XXXXXXXX"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.textMuted}
                 style={styles.phoneInput}
                 autoFocus
               />
@@ -240,11 +296,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
           </View>
         )}
 
-        {/* Step 3: OTP */}
+        {/* Step 3: OTP Verification */}
         {currentStep === 3 && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Verify OTP</Text>
-            <Text style={styles.cardSubtitle}>+977 {phoneNumber}</Text>
+            <Text style={styles.cardSubtitle}>Sent to +977 {phoneNumber}</Text>
 
             <View style={styles.otpGrid}>
               {otpDigits.map((digit, idx) => (
@@ -268,7 +324,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
             </View>
 
             <View style={styles.testModeBanner}>
-              <Text style={styles.testModeText}>Test OTP: 123456</Text>
+              <CheckCircle size={15} color={colors.brandGreen} />
+              <Text style={styles.testModeText}>Test OTP code: 123456</Text>
             </View>
 
             <TouchableOpacity
@@ -283,7 +340,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.primaryBtnText}>Verify</Text>
+                <Text style={styles.primaryBtnText}>Verify & Proceed</Text>
               )}
             </TouchableOpacity>
 
@@ -295,39 +352,41 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
               }}
               style={styles.backLink}
             >
-              <Text style={styles.backLinkText}>Edit phone number</Text>
+              <Text style={styles.backLinkText}>Change mobile number</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Step 4: Name & Address */}
+        {/* Step 4: Full Name & Human-Readable Location */}
         {currentStep === 4 && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Your Details</Text>
+            <Text style={styles.cardSubtitle}>Set your name and delivery location</Text>
 
             <Text style={styles.inputLabel}>Full Name</Text>
             <TextInput
               value={fullName}
               onChangeText={setFullName}
               placeholder="e.g. Bishal Sharma"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={colors.textMuted}
               style={styles.textInputField}
             />
 
-            <Text style={styles.inputLabel}>Delivery Address</Text>
-            {/* Tapping opens the interactive map pin selector */}
+            <Text style={styles.inputLabel}>Delivery Location</Text>
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.addressBox}
               onPress={() => setMapModalVisible(true)}
             >
               <View style={styles.addressRow}>
-                <MapPin size={18} color="#38B29C" />
+                <View style={styles.addressPinIconBox}>
+                  <MapPin size={18} color={colors.brandGreen} />
+                </View>
                 <View style={styles.addressMeta}>
                   <Text numberOfLines={2} style={styles.addressText}>
-                    {isDetectingLocation ? 'Detecting location...' : (addressText || 'Tap to select on map')}
+                    {isDetectingLocation ? 'Detecting your address...' : (addressText || 'Tap to select location on map')}
                   </Text>
-                  <Text style={styles.mapHintText}>Tap to change or pin on map</Text>
+                  <Text style={styles.mapHintText}>Tap to adjust or pin on Google Maps</Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -351,61 +410,75 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
         )}
       </ScrollView>
 
-      {/* Interactive Google Map Selector Modal */}
+      {/* Interactive Google Map Picker Modal */}
       <Modal
         visible={mapModalVisible}
         animationType="slide"
         onRequestClose={() => setMapModalVisible(false)}
       >
         <View style={styles.mapModalContainer}>
+          <StatusBar barStyle="dark-content" />
+
+          {/* Modal Header */}
           <View style={styles.mapModalHeader}>
-            <Text style={styles.mapModalTitle}>Pin Delivery Location</Text>
+            <View>
+              <Text style={styles.mapModalTitle}>Pin Delivery Location</Text>
+              <Text style={styles.mapModalSub}>Move map to place pin at your door</Text>
+            </View>
             <TouchableOpacity
               onPress={() => setMapModalVisible(false)}
               style={styles.closeBtn}
             >
-              <X size={20} color="#111827" />
+              <X size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
 
-          {/* Interactive Map Surface View */}
+          {/* Interactive Map */}
           <View style={styles.interactiveMapArea}>
-            <View style={styles.gridMapBackground}>
-              {/* Simulated Map Visual Surface with Road Networks */}
-              <View style={styles.roadHorizontal} />
-              <View style={styles.roadVertical} />
-              <View style={styles.darkStoreMarker}>
-                <Text style={styles.darkStoreMarkerText}>Gozii Dark Store</Text>
-              </View>
-
-              {/* Pinpoint Customer Gate Pin */}
-              <View style={styles.centerPinContainer}>
-                <View style={styles.pinBubble}>
-                  <Text style={styles.pinBubbleText}>Order arrives here</Text>
-                </View>
-                <MapPin size={38} color="#EF4444" />
-                <View style={styles.pinShadow} />
-              </View>
-            </View>
-          </View>
-
-          {/* Address Edit Card in Map View */}
-          <View style={styles.mapBottomCard}>
-            <Text style={styles.selectedAddressLabel}>Selected Delivery Location</Text>
-            <TextInput
-              value={addressText}
-              onChangeText={setAddressText}
-              placeholder="House / Tole / Area name"
-              style={styles.mapAddressInput}
+            <MapView
+              ref={mapRef}
+              style={StyleSheet.absoluteFill}
+              initialRegion={mapRegion}
+              onRegionChangeComplete={handleRegionChangeComplete}
+              showsUserLocation
+              showsMyLocationButton={false}
             />
 
+            {/* Static Center Pin (Gozii Teal Green) */}
+            <View style={styles.centerPinContainer} pointerEvents="none">
+              <View style={styles.pinBubble}>
+                <Text style={styles.pinBubbleText}>Order arrives here</Text>
+              </View>
+              <MapPin size={38} color={colors.brandGreen} />
+              <View style={styles.pinShadow} />
+            </View>
+
+            {/* GPS Recenter Button */}
             <TouchableOpacity
-              activeOpacity={0.88}
-              style={styles.confirmLocationBtn}
-              onPress={() => setMapModalVisible(false)}
+              style={styles.recenterBtn}
+              activeOpacity={0.85}
+              onPress={autoDetectLocation}
             >
-              <Check size={18} color="#FFFFFF" />
-              <Text style={styles.confirmLocationText}>Confirm Location</Text>
+              <Navigation size={18} color={colors.brandGreen} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Address Confirmation Card */}
+          <View style={styles.mapBottomCard}>
+            <Text style={styles.selectedAddressLabel}>Selected Delivery Location</Text>
+            <View style={styles.resolvedAddressBox}>
+              <MapPin size={16} color={colors.brandGreen} style={{ marginTop: 2, marginRight: 8 }} />
+              <Text style={styles.resolvedAddressText} numberOfLines={2}>
+                {isGeocodingPin ? 'Pinpointing address...' : tempAddressName}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.confirmPinBtn}
+              activeOpacity={0.88}
+              onPress={handleConfirmMapLocation}
+            >
+              <Text style={styles.confirmPinBtnText}>Confirm This Location</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -417,86 +490,101 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onSuccess }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#38B29C', // Gozii Brand Teal Green Background
+    backgroundColor: colors.brandGreen,
   },
   header: {
-    paddingTop: 56,
-    paddingBottom: 20,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingTop: 54,
+    paddingBottom: 24,
+  },
+  headerBrandText: {
+    marginTop: 8,
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  headerSubText: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.88)',
   },
   scrollBody: {
-    paddingHorizontal: 16,
-    paddingBottom: 30,
+    flexGrow: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    paddingBottom: 40,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    padding: 22,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    elevation: 6,
+    width: '100%',
   },
   cardTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#111827',
-    marginBottom: 16,
+    color: colors.textPrimary,
+    letterSpacing: -0.3,
   },
   cardSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 16,
-    fontWeight: '600',
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#374151',
-    marginBottom: 8,
-    textTransform: 'uppercase',
+    color: colors.textSecondary,
+    marginTop: 4,
+    marginBottom: 22,
   },
   phoneInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    backgroundColor: '#F9FAFB',
-    overflow: 'hidden',
-    marginBottom: 18,
+    marginBottom: 20,
   },
   prefixBox: {
-    backgroundColor: '#EEF2F6',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 54,
+    paddingHorizontal: 12,
+    backgroundColor: colors.canvasMuted,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    marginRight: 10,
+    gap: 6,
   },
   prefixText: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#111827',
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   phoneInput: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    height: 54,
+    backgroundColor: colors.canvasMuted,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.textPrimary,
+    letterSpacing: 1.2,
   },
   primaryBtn: {
-    backgroundColor: '#38B29C',
-    borderRadius: 12,
-    paddingVertical: 14,
+    height: 54,
+    backgroundColor: colors.brandGreen,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.brandGreen,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
   primaryBtnDisabled: {
     backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   btnContent: {
     flexDirection: 'row',
@@ -504,9 +592,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryBtnText: {
-    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   otpGrid: {
     flexDirection: 'row',
@@ -514,210 +602,225 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   otpBox: {
-    width: 44,
-    height: 52,
-    borderRadius: 10,
+    width: 48,
+    height: 56,
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
-    backgroundColor: '#F9FAFB',
+    borderColor: colors.border,
+    backgroundColor: colors.canvasMuted,
     textAlign: 'center',
     fontSize: 22,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.textPrimary,
   },
   otpBoxFilled: {
-    borderColor: '#38B29C',
-    backgroundColor: '#F0FAF8',
+    borderColor: colors.brandGreen,
+    backgroundColor: colors.brandGreenSubtle,
   },
   testModeBanner: {
-    backgroundColor: '#E8F7F4',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
+    backgroundColor: colors.brandGreenLight,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginBottom: 20,
+    gap: 6,
   },
   testModeText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#38B29C',
+    fontWeight: '700',
+    color: colors.brandGreenDark,
   },
   backLink: {
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 18,
+    paddingVertical: 6,
   },
   backLinkText: {
     fontSize: 13,
-    color: '#38B29C',
+    fontWeight: '600',
+    color: colors.brandGreen,
+  },
+  inputLabel: {
+    fontSize: 13,
     fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 6,
+    marginTop: 10,
   },
   textInputField: {
+    height: 52,
+    backgroundColor: colors.canvasMuted,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 10,
+    borderColor: colors.border,
     paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    color: colors.textPrimary,
+    marginBottom: 10,
   },
   addressBox: {
+    backgroundColor: colors.canvasMuted,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    borderColor: colors.border,
     padding: 14,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   addressRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+  },
+  addressPinIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.brandGreenLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
   addressMeta: {
     flex: 1,
   },
   addressText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
-    lineHeight: 18,
+    color: colors.textPrimary,
+    lineHeight: 19,
   },
   mapHintText: {
     fontSize: 11,
-    color: '#38B29C',
-    fontWeight: '700',
-    marginTop: 3,
+    color: colors.brandGreen,
+    fontWeight: '600',
+    marginTop: 2,
   },
+  // Map Modal
   mapModalContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
   mapModalHeader: {
-    paddingTop: 50,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 52,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.borderLight,
+    backgroundColor: '#FFFFFF',
   },
   mapModalTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#111827',
+    color: colors.textPrimary,
+  },
+  mapModalSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   closeBtn: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: colors.canvasMuted,
   },
   interactiveMapArea: {
     flex: 1,
-    backgroundColor: '#E2E8F0',
-  },
-  gridMapBackground: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
     position: 'relative',
+  },
+  centerPinContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -19,
+    marginTop: -38,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  roadHorizontal: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 24,
-    backgroundColor: '#CBD5E1',
-  },
-  roadVertical: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 24,
-    backgroundColor: '#CBD5E1',
-  },
-  darkStoreMarker: {
-    position: 'absolute',
-    top: 40,
-    left: 30,
-    backgroundColor: '#0F172A',
+  pinBubble: {
+    backgroundColor: colors.textPrimary,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
-  },
-  darkStoreMarkerText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  centerPinContainer: {
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  pinBubble: {
-    backgroundColor: '#111827',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
     marginBottom: 4,
   },
   pinBubbleText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   pinShadow: {
     width: 14,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    marginTop: -2,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    marginTop: -3,
+  },
+  recenterBtn: {
+    position: 'absolute',
+    bottom: 24,
+    right: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   mapBottomCard: {
-    padding: 20,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 34,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowRadius: 12,
+    elevation: 10,
   },
   selectedAddressLabel: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#6B7280',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  mapAddressInput: {
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  resolvedAddressBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.canvasMuted,
+    borderRadius: 12,
+    padding: 12,
     marginBottom: 16,
   },
-  confirmLocationBtn: {
-    backgroundColor: '#38B29C',
-    borderRadius: 12,
-    paddingVertical: 14,
-    flexDirection: 'row',
+  resolvedAddressText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    lineHeight: 19,
+  },
+  confirmPinBtn: {
+    height: 52,
+    backgroundColor: colors.brandGreen,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
   },
-  confirmLocationText: {
-    color: '#FFFFFF',
+  confirmPinBtnText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

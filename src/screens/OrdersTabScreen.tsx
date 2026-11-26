@@ -75,7 +75,7 @@ export const OrdersTabScreen: React.FC<OrdersTabScreenProps> = ({
         {orders.length === 0 ? (
           <View style={styles.noOrdersCard}>
             <View style={styles.clockCircle}>
-              <Clock size={28} color="#0C831F" />
+              <Clock size={28} color={colors.brandGreen} />
             </View>
             <Text style={styles.noOrdersTitle}>No active or past orders</Text>
             <Text style={styles.noOrdersSub}>
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#0C831F',
+    backgroundColor: colors.brandGreen,
     gap: 4,
   },
   reorderBtnText: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.brandGreenLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   startShopBtn: {
-    backgroundColor: '#0C831F',
+    backgroundColor: colors.brandGreen,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 10,

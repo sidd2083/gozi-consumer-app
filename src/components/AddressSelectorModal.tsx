@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { X, MapPin, Check, Plus, Navigation } from 'lucide-react-native';
 import * as Location from 'expo-location';
+import { reverseGeocodeToReadable, DARK_STORE_COORDS } from '../utils/geo';
 import { colors } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { UserAddress } from '../types';
@@ -48,25 +49,13 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
 
       const location = await Location.getCurrentPositionAsync({});
       const coords = location.coords;
-      const reverse = await Location.reverseGeocodeAsync({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
-
-      if (reverse && reverse.length > 0) {
-        const place = reverse[0];
-        setFullAddress(
-          `${place.name || ''} ${place.street || ''}, ${place.district || place.city || 'Kathmandu'}`.trim()
-        );
-        setLandmark(place.subregion || 'Kathmandu');
-      } else {
-        setFullAddress('Kathmandu Valley, Nepal');
-      }
+      const readable = await reverseGeocodeToReadable(coords.latitude, coords.longitude);
+      setFullAddress(readable);
+      setLandmark('Near Landmark');
       setLocating(false);
     } catch (e) {
-      console.warn('GPS detection error:', e);
-      setFullAddress('Lazimpat Road, Ward 3, Kathmandu');
-      setLandmark('Near Main Gate');
+      setFullAddress('School Road, Hetauda-4');
+      setLandmark('Near Main Chowk');
       setLocating(false);
     }
   };
@@ -81,8 +70,8 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
       label,
       fullAddress: fullAddress.trim(),
       landmark: landmark.trim() || 'Near Landmark',
-      lat: 27.7172,
-      lng: 85.3240,
+      lat: DARK_STORE_COORDS.lat,
+      lng: DARK_STORE_COORDS.lng,
     });
 
     setShowAddForm(false);
@@ -117,7 +106,7 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
                     handleDetectGPS();
                   }}
                 >
-                  <Navigation size={18} color="#0C831F" />
+                  <Navigation size={18} color={colors.brandGreen} />
                   <View style={styles.gpsMeta}>
                     <Text style={styles.gpsTitle}>Use Current Location</Text>
                     <Text style={styles.gpsSub}>
@@ -292,11 +281,11 @@ const styles = StyleSheet.create({
   gpsTitle: {
     fontSize: 13.5,
     fontWeight: '800',
-    color: '#0C831F',
+    color: colors.brandGreen,
   },
   gpsSub: {
     fontSize: 11,
-    color: '#2E7D32',
+    color: colors.brandGreenDark,
     marginTop: 2,
   },
   subHeading: {

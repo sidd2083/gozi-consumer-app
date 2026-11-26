@@ -83,8 +83,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <Text style={styles.unitText}>{product.unit}</Text>
               </View>
               <View style={styles.fastDeliveryBadge}>
-                <Clock size={12} color="#0C831F" />
-                <Text style={styles.fastDeliveryText}>10 MINS DELIVERY</Text>
+                <Clock size={12} color={colors.brandGreenDark} />
+                <Text style={styles.fastDeliveryText}>QUICK DELIVERY</Text>
               </View>
             </View>
 
@@ -108,7 +108,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             {/* Trust Assurances */}
             <View style={styles.assuranceBox}>
-              <ShieldCheck size={18} color="#0C831F" />
+              <ShieldCheck size={18} color={colors.brandGreen} />
               <Text style={styles.assuranceText}>
                 100% Quality Inspected Dark Store Stock • Direct Replacements
               </Text>
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   fastDeliveryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.brandGreenLight,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   fastDeliveryText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#0C831F',
+    color: colors.brandGreenDark,
     letterSpacing: 0.3,
   },
   title: {
@@ -311,17 +311,17 @@ const styles = StyleSheet.create({
   assuranceBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FDF4',
+    backgroundColor: colors.brandGreenLight,
     padding: 12,
     borderRadius: 10,
     marginTop: 18,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#DCFCE7',
+    borderColor: colors.brandGreenLight,
   },
   assuranceText: {
     fontSize: 12,
-    color: '#166534',
+    color: colors.brandGreenDark,
     fontWeight: '600',
     flex: 1,
   },

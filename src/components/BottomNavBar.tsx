@@ -13,11 +13,8 @@ interface BottomNavBarProps {
 }
 
 /**
- * Zepto-style Floating Curved Pill / Dock Menu:
- * - Floating rounded pill (borderRadius: 28)
- * - Elevated above bottom edge with soft natural drop shadow
- * - Scroll-reactive: Slides down smoothly on scroll-down, slides up on scroll-up
- * - Active tab in Gozi logo green (#38B29C), ZERO RED
+ * Zepto-style Floating Curved Pill / Dock Menu
+ * Active tab in Gozii logo green (#27A98C), ZERO RED
  */
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   currentTab,
@@ -61,7 +58,6 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
                   strokeWidth={isActive ? 2.6 : 2}
                 />
 
-                {/* Live Cart Count Badge in Gozi Green */}
                 {tab.key === 'cart' && totalItems > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
@@ -98,45 +94,43 @@ const styles = StyleSheet.create({
   },
   dockContainer: {
     width: '100%',
-    maxWidth: 360,
-    height: 58,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 29,
+    maxWidth: 320,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    paddingVertical: 10,
     paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: '#E8ECF4',
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
-    shadowRadius: 16,
+    shadowRadius: 14,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   tabButton: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 14,
     borderRadius: 20,
   },
   tabButtonActive: {
-    backgroundColor: colors.brandGreenSubtle,
+    backgroundColor: colors.brandGreenLight,
   },
   iconWrapper: {
     position: 'relative',
-    height: 22,
-    justifyContent: 'center',
   },
   badge: {
     position: 'absolute',
-    top: -5,
+    top: -6,
     right: -10,
     backgroundColor: colors.brandGreen,
-    borderRadius: 9,
-    minWidth: 17,
-    height: 17,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
@@ -146,14 +140,13 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#FFFFFF',
     fontSize: 9,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
+    fontWeight: '800',
   },
   tabLabel: {
-    fontSize: 11,
+    marginTop: 3,
+    fontSize: 10,
     fontWeight: '600',
     color: '#6B7280',
-    marginTop: 2,
   },
   tabLabelActive: {
     color: colors.brandGreenDark,

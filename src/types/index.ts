@@ -2,6 +2,7 @@ export interface AppConfig {
   deliveryFee: number;
   freeDeliveryAbove: number;
   estimatedMinutes: number;
+  catalogVersion?: number;
   storeCoordinates: {
     lat: number;
     lng: number;
@@ -29,17 +30,21 @@ export interface UserProfile {
 export type DepartmentName =
   | 'Grocery & Kitchen'
   | 'Snacks & Drinks'
-  | 'Beverages & Smokes'
-  | 'Late Night Craving Combo'
-  | 'Beauty & Personal Care';
+  | 'Liquors & Smokes'
+  | 'Beauty & Personal Care'
+  | 'Household Essentials & Stationery'
+  | 'Late Night Combos'
+  | 'Frozen Items'
+  | 'Trending Products';
 
 export interface Category {
   id: string;
   name: string;
-  imageUrl: string;
+  imageUrl?: string;
   department: DepartmentName;
   priorityOrder: number;
   isActive: boolean;
+  subCategories?: string[];
 }
 
 export interface Product {
@@ -47,6 +52,7 @@ export interface Product {
   name: string;
   description: string;
   categoryId: string;
+  subCategory?: string;
   department: DepartmentName;
   unit: string;
   mrp: number;
@@ -57,6 +63,7 @@ export interface Product {
   isHidden: boolean;
   isTrending: boolean;
   isCombo?: boolean;
+  isFrozen?: boolean;
   storeId: string;
   createdAt: string;
   updatedAt: string;
@@ -98,19 +105,22 @@ export interface Order {
   userId: string;
   customerName: string;
   customerPhone: string;
-  deliveryAddress: {
+  address?: UserAddress;
+  deliveryAddress?: {
     fullAddress: string;
-    landmark: string;
+    landmark?: string;
     lat: number;
     lng: number;
   };
   items: OrderItem[];
   bill: OrderBill;
-  paymentMethod: 'COD';
   status: OrderStatus;
-  riderId: string | null;
-  riderDetails: RiderDetails | null;
-  storeId: string;
+  rider?: RiderDetails;
+  riderId?: string | null;
+  riderDetails?: RiderDetails | null;
+  paymentMethod?: string;
+  storeId?: string;
+  deliveryEtaMinutes?: number;
   createdAt: string;
   updatedAt: string;
 }
