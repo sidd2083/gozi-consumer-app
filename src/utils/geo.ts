@@ -45,7 +45,7 @@ export function calculateDeliveryEta(lat?: number, lng?: number): {
   if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
     return {
       minutes: 10,
-      label: '10 mins',
+      label: '10 MINS',
       distanceKm: 1.2,
     };
   }
@@ -57,22 +57,37 @@ export function calculateDeliveryEta(lat?: number, lng?: number): {
     lng
   );
 
-  // If destination is within 1 km: ~8 to 10 mins
-  // If destination is 2 km: ~10 to 12 mins
-  // If destination is 3 km: ~13 to 15 mins
   const travelMins = dist * 2.5;
   const totalMins = Math.max(8, Math.round(5 + travelMins));
 
   return {
     minutes: totalMins,
-    label: `${totalMins} mins`,
+    label: `${totalMins} MINS`,
     distanceKm: Math.round(dist * 10) / 10,
   };
 }
 
 /**
- * Reverse geocodes coordinates to a clean, human-readable address label.
- * NEVER returns raw latitude/longitude numbers.
+ * Checks if a string is a Plus Code (like C2CR+92), an unhelpful short code, or raw coordinates.
+ */
+function isPlusCodeOrInvalid(str: string): boolean {
+  if (!str) return true;
+  const trimmed = str.trim();
+  // Plus code format like C2CR+3X, 87Q8C2CR+92
+  if (/[A-Z0-9]{2,8}\+[A-Z0-9]*/i.test(trimmed)) return true;
+  // Short 3-4 alphanumeric codes without vowels/spaces like C2CR
+  if (/^[A-Z0-9]{3,5}$/i.test(trimmed) && !/^(road|tole|ward|chowk|gate|city)/i.test(trimmed)) return true;
+  // Raw numeric coordinates
+  if (/^\d{1,3}\.\d+$/.test(trimmed)) return true;
+  if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(trimmed)) return true;
+  // Unnamed road codes
+  if (/^unnamed/i.test(trimmed)) return true;
+  return false;
+}
+
+/**
+ * Reverse geocodes coordinates to a clean, human-readable exact address label.
+ * Strictly eliminates Plus Codes (like C2CR) and raw numbers.
  */
 export async function reverseGeocodeToReadable(
   latitude: number,
@@ -84,18 +99,22 @@ export async function reverseGeocodeToReadable(
       const place = results[0];
       const parts: string[] = [];
 
-      if (place.name && !isRawCoordinate(place.name)) {
+      // Check street name first
+      if (place.street && !isPlusCodeOrInvalid(place.street)) {
+        parts.push(place.street);
+      } else if (place.name && !isPlusCodeOrInvalid(place.name)) {
         parts.push(place.name);
       }
-      if (place.street && !isRawCoordinate(place.street) && !parts.includes(place.street)) {
-        parts.push(place.street);
-      }
-      if (place.subregion && !parts.includes(place.subregion)) {
+
+      // Check subregion / locality / ward
+      if (place.subregion && !isPlusCodeOrInvalid(place.subregion) && !parts.includes(place.subregion)) {
         parts.push(place.subregion);
-      } else if (place.city && !parts.includes(place.city)) {
-        parts.push(place.city);
-      } else if (place.district && !parts.includes(place.district)) {
-        parts.push(place.district);
+      }
+
+      // Check city or district
+      const cityOrDistrict = place.city || place.district || 'Hetauda';
+      if (!isPlusCodeOrInvalid(cityOrDistrict) && !parts.includes(cityOrDistrict)) {
+        parts.push(cityOrDistrict);
       }
 
       if (parts.length > 0) {
@@ -103,13 +122,9 @@ export async function reverseGeocodeToReadable(
       }
     }
   } catch (e) {
-    // Graceful fallback on permission error or network failure
+    // Fallback on error
   }
 
-  // Sensible default human-readable locality in Hetauda
-  return 'School Road, Hetauda-4';
-}
-
-function isRawCoordinate(str: string): boolean {
-  return /^\d{1,3}\.\d+$/.test(str.trim()) || /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(str.trim());
+  // Exact human-readable doorstep default in Hetauda
+  return 'School Road, Hetauda-4, Makwanpur';
 }
